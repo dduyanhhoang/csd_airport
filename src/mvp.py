@@ -2,6 +2,7 @@ from math import sqrt
 from typing import List
 
 import heapq
+import os
 
 
 class Airport:
@@ -34,6 +35,9 @@ class Airport:
     @loc.setter
     def loc(self, loc: list):
         if len(loc) == 2:
+            for c in loc:
+                if not isinstance(c, float):
+                    raise ValueError("Invalid location")
             self._loc = loc
         else:
             raise ValueError("Invalid location")
@@ -187,21 +191,219 @@ class AirportSystem:
 
         return f_path, distances[end_id]
 
+    def find_shortest_route_with_stop(self, start_id: str, stop_id: str, end_id: str):
+        path1, cost1 = self.find_shortest_route(start_id, stop_id)
 
-if __name__ == '__main__':
+        path2, cost2 = self.find_shortest_route(stop_id, end_id)
+
+        full_path = path1[:-1] + path2
+
+        total_cost = cost1 + cost2
+
+        return full_path, total_cost
+
+    def display_graph(self):
+        adjacency_list = {airport: [] for airport in self.airports}
+        for f in self.flights:
+            adjacency_list[f.dep.a_id].append((f.des.a_id, f))
+
+        print("Airline Graph:")
+        for airport, neighbors in adjacency_list.items():
+            print(f"{airport}:")
+            for neighbor in neighbors:
+                print(
+                    f"  -> {neighbor[0]} (Aircraft: {neighbor[1].aircraft_type}, Cost: {self.calculate_cost(neighbor[1]):.2f})")
+
+    def generate_mermaid(self) -> str:
+        mermaid = ["flowchart TD"]
+
+        for f in self.flights:
+            dep_id = f.dep.a_id
+            des_id = f.des.a_id
+            c = self.calculate_cost(f)
+            mermaid.append(f"{dep_id}({dep_id}) -->|{c:.2f}| {des_id}({des_id})")
+
+        return "\n".join(mermaid)
+
+
+def example():
     airport_system = AirportSystem()
 
+    # Add some airports
     airport_system.add_airport(Airport("JFK", [40.6413, -73.7781], "L"))
     airport_system.add_airport(Airport("LAX", [33.9416, -118.4085], "L"))
+    airport_system.add_airport(Airport("ORD", [41.9742, -87.9073], "L"))
+    airport_system.add_airport(Airport("ATL", [33.6407, -84.4277], "L"))
+    airport_system.add_airport(Airport("DFW", [32.8998, -97.0403], "L"))
+    airport_system.add_airport(Airport("DEN", [39.8561, -104.6737], "L"))
+    airport_system.add_airport(Airport("SFO", [37.6213, -122.3790], "L"))
 
-    flight = Flight(airport_system.airports["JFK"], airport_system.airports["LAX"], "L")
-    airport_system.add_flight(flight)
+    # Add some flights
+    airport_system.add_flight(Flight(airport_system.airports["JFK"], airport_system.airports["LAX"], "L"))
+    airport_system.add_flight(Flight(airport_system.airports["JFK"], airport_system.airports["ORD"], "M"))
+    airport_system.add_flight(Flight(airport_system.airports["ORD"], airport_system.airports["LAX"], "S"))
+    airport_system.add_flight(Flight(airport_system.airports["ORD"], airport_system.airports["ATL"], "L"))
+    airport_system.add_flight(Flight(airport_system.airports["ATL"], airport_system.airports["DFW"], "M"))
+    airport_system.add_flight(Flight(airport_system.airports["DFW"], airport_system.airports["LAX"], "S"))
+    airport_system.add_flight(Flight(airport_system.airports["DFW"], airport_system.airports["DEN"], "M"))
+    airport_system.add_flight(Flight(airport_system.airports["DEN"], airport_system.airports["SFO"], "L"))
+    airport_system.add_flight(Flight(airport_system.airports["LAX"], airport_system.airports["SFO"], "L"))
 
+    # Display airports and flights
+    print("Airports:")
     airport_system.display_airports()
+    print("\nFlights:")
     airport_system.display_flights()
 
+    # Calculate cost for a specific flight
+    flight = Flight(airport_system.airports["JFK"], airport_system.airports["LAX"], "L")
     cost = airport_system.calculate_cost(flight)
-    print("Cost:", cost)
+    print("\nCost from JFK to LAX:", cost)
 
-    path, cost = airport_system.find_shortest_route("JFK", "LAX")
-    print("Shortest path:", path, "with cost:", cost)
+    # Find the shortest route from JFK to SFO
+    path, cost = airport_system.find_shortest_route("JFK", "SFO")
+    print("\nShortest path from JFK to SFO:", path, "with cost:", cost)
+
+    airport_system.display_graph()
+    mermaid_graph = airport_system.generate_mermaid()
+    print(mermaid_graph)
+
+
+def clear_screen():
+    if os.name == 'nt':
+        os.system('cls')  # For Windows
+    else:
+        os.system('clear')
+
+
+def menu():
+    airport_system = AirportSystem()
+
+    while True:
+        clear_screen()
+        print("Airport System Menu")
+        print("1. Add airport")
+        print("2. Remove airport")
+        print("3. Update airport")
+        print("4. Display airports")
+        print("5. Add flight")
+        print("6. Display flights")
+        print("7. Calculate cost")
+        print("8. Find shortest route")
+        print("9. Find shortest route with stop")
+        print("10. Display graph")
+        print("11. Generate Mermaid")
+        print("12. Exit")
+
+        choice = input("Enter choice: ").strip()
+
+        if choice not in [str(i) for i in range(1, 13)]:
+            clear_screen()
+            print("Invalid choice. Please enter a number between 1 and 12.")
+            input("Press Enter to return to the menu...")
+            continue
+
+        clear_screen()  # Clear screen before each operation to ensure clean output
+
+        try:
+            if choice == "1":
+                a_id = input("Enter airport ID: ").strip()
+                if not a_id:
+                    raise ValueError("Airport ID cannot be blank.")
+                loc = [float(x) for x in input("Enter location (lat, long): ").strip().split(",")]
+                if len(loc) != 2:
+                    raise ValueError("Location must contain two values: latitude and longitude.")
+                airport_type = input("Enter airport type (L, M, S): ").strip().upper()
+                if airport_type not in ['L', 'M', 'S']:
+                    raise ValueError("Airport type must be 'L', 'M', or 'S'.")
+                airport_system.add_airport(Airport(a_id, loc, airport_type))
+                print("Airport added successfully.")
+            elif choice == "2":
+                a_id = input("Enter airport ID: ").strip()
+                if not a_id:
+                    raise ValueError("Airport ID cannot be blank.")
+                airport_system.remove_airport(a_id)
+                print("Airport removed successfully.")
+            elif choice == "3":
+                a_id = input("Enter airport ID: ").strip()
+                if not a_id:
+                    raise ValueError("Airport ID cannot be blank.")
+                new_loc = [float(x) for x in input("Enter new location (lat, long): ").strip().split(",")]
+                if len(new_loc) != 2:
+                    raise ValueError("Location must contain two values: latitude and longitude.")
+                new_type = input("Enter new airport type (L, M, S): ").strip().upper()
+                if new_type not in ['L', 'M', 'S']:
+                    raise ValueError("Airport type must be 'L', 'M', or 'S'.")
+                airport_system.update_airport(a_id, new_loc, new_type)
+                print("Airport updated successfully.")
+            elif choice == "4":
+                airport_system.display_airports()
+            elif choice == "5":
+                dep = input("Enter departure airport ID: ").strip()
+                des = input("Enter destination airport ID: ").strip()
+                aircraft_type = input("Enter aircraft type (L, M, S): ").strip().upper()
+                if aircraft_type not in ['L', 'M', 'S']:
+                    raise ValueError("Aircraft type must be 'L', 'M', or 'S'.")
+                if dep not in airport_system.airports or des not in airport_system.airports:
+                    raise ValueError("Both departure and destination airports must exist in the system.")
+                airport_system.add_flight(Flight(airport_system.airports[dep], airport_system.airports[des], aircraft_type))
+                print("Flight added successfully.")
+            elif choice == "6":
+                airport_system.display_flights()
+            elif choice == "7":
+                dep = input("Enter departure airport ID: ").strip()
+                des = input("Enter destination airport ID: ").strip()
+                aircraft_type = input("Enter aircraft type (L, M, S): ").strip().upper()
+                if aircraft_type not in ['L', 'M', 'S']:
+                    raise ValueError("Aircraft type must be 'L', 'M', or 'S'.")
+                if dep not in airport_system.airports or des not in airport_system.airports:
+                    raise ValueError("Both departure and destination airports must exist in the system.")
+                flight = Flight(airport_system.airports[dep], airport_system.airports[des], aircraft_type)
+                cost = airport_system.calculate_cost(flight)
+                print("Cost:", cost)
+            elif choice == "8":
+                start_id = input("Enter start airport ID: ").strip()
+                end_id = input("Enter end airport ID: ").strip()
+                if start_id not in airport_system.airports or end_id not in airport_system.airports:
+                    raise ValueError("Both start and end airports must exist in the system.")
+                path, cost = airport_system.find_shortest_route(start_id, end_id)
+                print("Shortest path:", path, "with cost:", cost)
+            elif choice == "9":
+                start_id = input("Enter start airport ID: ").strip()
+                stop_id = input("Enter stop airport ID: ").strip()
+                end_id = input("Enter end airport ID: ").strip()
+                if start_id not in airport_system.airports or stop_id not in airport_system.airports or end_id not in airport_system.airports:
+                    raise ValueError("All start, stop, and end airports must exist in the system.")
+                path, cost = airport_system.find_shortest_route_with_stop(start_id, stop_id, end_id)
+                print("Shortest path with stop:", path, "with cost:", cost)
+            elif choice == "10":
+                airport_system.display_graph()
+                mermaid_graph = airport_system.generate_mermaid()
+                with open("output.md", "w") as file:
+                    file.write("```mermaid\n")
+                    file.write(mermaid_graph)
+                    file.write("\n```")
+                print("Mermaid graph code written to output.md")
+            elif choice == "11":
+                mermaid_graph = airport_system.generate_mermaid()
+                print(mermaid_graph)
+                with open("output.md", "w") as file:
+                    file.write("```mermaid\n")
+                    file.write(mermaid_graph)
+                    file.write("\n```")
+                print("Mermaid graph code written to output.md")
+            elif choice == "12":
+                break
+        except ValueError as ve:
+            print(f"Error: {ve}")
+        except KeyError as ke:
+            print(f"Error: {ke}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+
+        input("Press Enter to return to the menu...")
+
+
+if __name__ == '__main__':
+    # example()
+    menu()
