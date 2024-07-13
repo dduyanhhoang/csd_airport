@@ -217,11 +217,14 @@ class AirportSystem:
     def generate_mermaid(self) -> str:
         mermaid = ["flowchart TD"]
 
+        for a in self.airports:
+            mermaid.append(f"\t{a}({a})")
+
         for f in self.flights:
             dep_id = f.dep.a_id
             des_id = f.des.a_id
             c = self.calculate_cost(f)
-            mermaid.append(f"{dep_id}({dep_id}) -->|{c:.2f}| {des_id}({des_id})")
+            mermaid.append(f"\t{dep_id}({dep_id}) -->|{c:.2f}| {des_id}({des_id})")
 
         return "\n".join(mermaid)
 
@@ -240,6 +243,8 @@ def example():
 
     # Add some flights
     airport_system.add_flight(Flight(airport_system.airports["JFK"], airport_system.airports["LAX"], "L"))
+    airport_system.add_flight(Flight(airport_system.airports["JFK"], airport_system.airports["LAX"], "M"))
+    airport_system.add_flight(Flight(airport_system.airports["JFK"], airport_system.airports["LAX"], "M"))
     airport_system.add_flight(Flight(airport_system.airports["JFK"], airport_system.airports["ORD"], "M"))
     airport_system.add_flight(Flight(airport_system.airports["ORD"], airport_system.airports["LAX"], "S"))
     airport_system.add_flight(Flight(airport_system.airports["ORD"], airport_system.airports["ATL"], "L"))
@@ -249,24 +254,50 @@ def example():
     airport_system.add_flight(Flight(airport_system.airports["DEN"], airport_system.airports["SFO"], "L"))
     airport_system.add_flight(Flight(airport_system.airports["LAX"], airport_system.airports["SFO"], "L"))
 
-    # Display airports and flights
-    print("Airports:")
-    airport_system.display_airports()
-    print("\nFlights:")
-    airport_system.display_flights()
+    while True:
+        try:
+            clear_screen()
+            airport_system.display_graph()
+            print_graph = input("Do you want to display the graph? (Y/N): ").strip().upper()
+            if print_graph not in ['Y', 'N']:
+                clear_screen()
+                raise ValueError("Invalid choice. Please enter 'Y' or 'N'.")
+            break
+        except ValueError as ve:
+            print(f"Error: {ve}")
+            input("Press Enter to try again...")
 
-    # Calculate cost for a specific flight
-    flight = Flight(airport_system.airports["JFK"], airport_system.airports["LAX"], "L")
-    cost = airport_system.calculate_cost(flight)
-    print("\nCost from JFK to LAX:", cost)
+    if print_graph == 'Y':
+        with open("output.md", "a") as file:
+            file.write("```mermaid\n")
+            file.write(airport_system.generate_mermaid())
+            file.write("\n```\n\n")
+        print("Mermaid graph code written to output.md")
 
-    # Find the shortest route from JFK to SFO
-    path, cost = airport_system.find_shortest_route("JFK", "SFO")
-    print("\nShortest path from JFK to SFO:", path, "with cost:", cost)
+    while True:
+        try:
+            user_input = input("Perform the finding the short test path? (Y/N): ").strip().upper()
+            if user_input not in ['Y', 'N']:
+                raise ValueError("Invalid choice. Please enter 'Y' or 'N'.")
+            break
+        except ValueError as ve:
+            print(f"Error: {ve}")
+            input("Press Enter to try again...")
 
-    airport_system.display_graph()
-    mermaid_graph = airport_system.generate_mermaid()
-    print(mermaid_graph)
+    if user_input == 'Y':
+        s = input("Enter start airport ID: ").strip().upper()
+        e = input("Enter end airport ID: ").strip().upper()
+
+        path, cost = airport_system.find_shortest_route(s, e)
+        print("\nShortest path from JFK to SFO:", path, "with cost:", cost)
+
+        with open("output.md", "a") as file:
+            file.write("```mermaid\n")
+            file.write(airport_system.generate_mermaid())
+            for d in path:
+                file.write(f"\n\tstyle {d} stroke:#0f0")
+            file.write("\n```\n\n")
+            print("Mermaid graph code written to output.md")
 
 
 def clear_screen():
@@ -303,7 +334,7 @@ def menu():
             input("Press Enter to return to the menu...")
             continue
 
-        clear_screen()  # Clear screen before each operation to ensure clean output
+        clear_screen()
 
         try:
             if choice == "1":
@@ -318,12 +349,18 @@ def menu():
                     raise ValueError("Airport type must be 'L', 'M', or 'S'.")
                 airport_system.add_airport(Airport(a_id, loc, airport_type))
                 print("Airport added successfully.")
+                airport_system.display_airports()
             elif choice == "2":
                 a_id = input("Enter airport ID: ").strip()
                 if not a_id:
                     raise ValueError("Airport ID cannot be blank.")
                 airport_system.remove_airport(a_id)
+                for f in airport_system.flights:
+                    if f.dep.a_id == a_id or f.des.a_id == a_id:
+                        airport_system.flights.remove(f)
+
                 print("Airport removed successfully.")
+                airport_system.display_airports()
             elif choice == "3":
                 a_id = input("Enter airport ID: ").strip()
                 if not a_id:
@@ -336,6 +373,7 @@ def menu():
                     raise ValueError("Airport type must be 'L', 'M', or 'S'.")
                 airport_system.update_airport(a_id, new_loc, new_type)
                 print("Airport updated successfully.")
+                airport_system.display_airports()
             elif choice == "4":
                 airport_system.display_airports()
             elif choice == "5":
@@ -348,6 +386,7 @@ def menu():
                     raise ValueError("Both departure and destination airports must exist in the system.")
                 airport_system.add_flight(Flight(airport_system.airports[dep], airport_system.airports[des], aircraft_type))
                 print("Flight added successfully.")
+                airport_system.display_flights()
             elif choice == "6":
                 airport_system.display_flights()
             elif choice == "7":
@@ -368,6 +407,14 @@ def menu():
                     raise ValueError("Both start and end airports must exist in the system.")
                 path, cost = airport_system.find_shortest_route(start_id, end_id)
                 print("Shortest path:", path, "with cost:", cost)
+
+                with open("output.md", "a") as file:
+                    file.write("```mermaid\n")
+                    file.write(airport_system.generate_mermaid())
+                    for d in path:
+                        file.write(f"\n\tstyle {d} stroke:#0f0")
+                    file.write("\n```\n\n")
+                    print("Mermaid graph code written to output.md")
             elif choice == "9":
                 start_id = input("Enter start airport ID: ").strip()
                 stop_id = input("Enter stop airport ID: ").strip()
@@ -379,7 +426,7 @@ def menu():
             elif choice == "10":
                 airport_system.display_graph()
                 mermaid_graph = airport_system.generate_mermaid()
-                with open("output.md", "w") as file:
+                with open("output.md", "a") as file:
                     file.write("```mermaid\n")
                     file.write(mermaid_graph)
                     file.write("\n```")
@@ -387,10 +434,10 @@ def menu():
             elif choice == "11":
                 mermaid_graph = airport_system.generate_mermaid()
                 print(mermaid_graph)
-                with open("output.md", "w") as file:
+                with open("output.md", "a") as file:
                     file.write("```mermaid\n")
                     file.write(mermaid_graph)
-                    file.write("\n```")
+                    file.write("\n```\n")
                 print("Mermaid graph code written to output.md")
             elif choice == "12":
                 break
@@ -405,5 +452,16 @@ def menu():
 
 
 if __name__ == '__main__':
-    # example()
-    menu()
+    while True:
+        clear_screen()
+        user_choice = input("Do you want to run the example or the menu? (E/M): ").strip().upper()
+        if user_choice in ['E', 'M']:
+            break
+        else:
+            print("Invalid choice. Please enter 'E' for example or 'M' for menu.")
+            input("Press Enter to try again...")
+
+    if user_choice == 'E':
+        example()
+    else:
+        menu()
